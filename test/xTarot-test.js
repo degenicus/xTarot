@@ -28,6 +28,7 @@ describe("Vaults", function () {
   const tarotSupplyVaultRouter01 = "0x3E9F34309B2f046F4f43c0376EFE2fdC27a10251";
   const tarotAddress = "0xC5e2B037D30a390e62180970B3aa4E91868764cD";
   const xTarotAddress = "0x74D1D2A851e339B8cB953716445Be7E8aBdf92F4";
+  const bTarotAddress = "0xe0d10cefc6cdfbbde41a12c8bbe9548587568329";
   const XStakingPoolControllerAddress =
     "0x466eBD9EC2027776fa11a982E9BBe4F67aa6e86B";
   const uniRouter = "0xF491e7B69E4244ad4002BC14e878a34207E38c29";
@@ -104,8 +105,7 @@ describe("Vaults", function () {
     strategy = await Strategy.deploy(
       uniRouter,
       XStakingPoolControllerAddress,
-      tarotAddress,
-      xTarotAddress,
+      tarotSupplyVaultRouter01,
       vault.address,
       treasury.address,
       strategist
@@ -143,7 +143,7 @@ describe("Vaults", function () {
   });
 
   describe("Deploying the vault and strategy", function () {
-    it("should initiate vault with a 0 balance", async function () {
+    xit("should initiate vault with a 0 balance", async function () {
       console.log(1);
       const totalBalance = await vault.balance();
       console.log(2);
@@ -222,10 +222,10 @@ describe("Vaults", function () {
         ownerAddress
       );
       console.log(
-        `ownerVaultBooBalanceAfterWithdraw: ${ownerVaultBooBalanceAfterWithdraw}`
+        `ownerVaultTarotBalanceAfterWithdraw: ${ownerVaultTarotBalanceAfterWithdraw}`
       );
-      // expect(ownerBooBalance).to.equal(ownerDepositAmount);
-      // expect(selfBooBalance).to.equal(selfDepositAmount);
+      expect(ownerTarotBalance).to.equal(ownerDepositAmount);
+      expect(selfTarotBalance).to.equal(selfDepositAmount);
     });
     xit("should allow withdrawals", async function () {
       const userBalance = await boo.balanceOf(selfAddress);

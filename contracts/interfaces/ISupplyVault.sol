@@ -1,10 +1,11 @@
 pragma solidity >=0.5.0;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+// import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./IERC20.sol";
 import "./IBorrowable.sol";
 import "./ISupplyVaultStrategy.sol";
 
-interface ISupplyVault {
+interface ISupplyVault is IERC20 {
     /* Vault */
     function enter(uint256 _amount) external returns (uint256 share);
 
