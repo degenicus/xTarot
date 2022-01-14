@@ -8,6 +8,7 @@ import "./interfaces/IUniswapRouterETH.sol";
 import "./interfaces/ISupplyVaultRouter01.sol";
 import "./interfaces/IBorrowable.sol";
 import "./interfaces/ISupplyVault.sol";
+import "./interfaces/IXStakingPoolController.sol";
 import "./libraries/SafeERC20.sol";
 import "./libraries/SafeMath.sol";
 // import "./libraries/BorrowableHelpers.sol";
@@ -63,13 +64,14 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      * {hasAllocatedToPool} - If a given pool id has been deposited into already for a harvest cycle
      * {WFTM_POOL_ID} - Id for the wftm pool to use as default pool before pool selection
      * {maxPoolDilutionFactor} - The factor that determines what % of a pools total TVL can be deposited (to avoid dilution)
+     * {netDepositSinceLastHarvest} - The net balance of deposit and withdraws in {stakingToken} (can be positive or negative) since the last harvest
      */
-    uint8 public currentPoolId;
-    uint8[] public currentlyUsedPools;
+    uint256 public currentPoolId;
+    uint256[] public currentlyUsedPools;
     mapping(uint8 => uint256) public poolYield;
     mapping(uint8 => bool) public hasAllocatedToPool;
-    uint8 private constant WFTM_POOL_ID = 2;
-    uint8 public maxPoolDilutionFactor = 5;
+    uint256 public maxPoolDilutionFactor = 5;
+    int256 public netDepositSinceLastHarvest = 0;
 
     /**
      * @dev Variables for pool selection
@@ -77,7 +79,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      * {poolxBooBalance} - The amount of xBoo deposited into each pool
      */
     uint256 public totalPoolBalance = 0;
-    mapping(uint8 => uint256) public poolxTarotBalance;
+    mapping(uint256 => uint256) public poolxTarotBalance;
 
     /**
      * {UpdatedStrategist} Event that is fired each time the strategist role is updated.
@@ -100,7 +102,6 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
         stakingPoolController = _stakingPoolController;
         supplyVaultRouter = ISupplyVaultRouter01(_supplyVaultRouter);
         wftmToTarotRoute = [wftm, tarot];
-        currentPoolId = WFTM_POOL_ID;
 
         _giveAllowances();
     }
@@ -113,69 +114,32 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      */
     function deposit() public whenNotPaused {
         console.log("deposit()");
-        uint256 tarotBalance = IERC20(tarot).balanceOf(address(this));
-        console.log("tarotBalance: ", tarotBalance);
+        uint256 xTarotBalance = IERC20(xTarot).balanceOf(address(this));
+        netDepositSinceLastHarvest =
+            netDepositSinceLastHarvest +
+            int256(xTarotBalance);
+        console.log("xTarotBalance: ", xTarotBalance);
 
-        if (tarotBalance > 0) {
-            uint256 share = supplyVaultRouter.enter(
-                xTarot,
-                tarotBalance,
-                bTarot
-            );
-            // supplyVaultRouter.leave(xTarot, share);
-            // tarotBalance = IERC20(tarot).balanceOf(address(this));
-            // console.log("tarotBalance: ", tarotBalance);
-            //     uint256 totalUnderlying = _applyFee();
-            // uint256 shareAmount = balanceOf(_account);
-            // uint256 totalShares = totalSupply();
-            // underlyingBalance = shareAmount.mul(totalUnderlying).div(totalShares);
-            uint256 totalUnderlying = _getTotalUnderlying();
-            uint256 totalSupply = xTarot.totalSupply();
-            uint256 xTarotBalance = xTarot.balanceOf(address(this));
-            uint256 underlyingBalance = xTarotBalance.mul(totalUnderlying).div(
-                totalSupply
-            );
-            console.log("totalUnderlying: ", totalUnderlying);
-            console.log("totalSupply: ", totalSupply);
-            console.log("xTarotBalance: ", xTarotBalance);
-            console.log("underlyingBalance: ", underlyingBalance);
-
-            uint256 underlyingBalanceForAccount = xTarot
-                .underlyingBalanceForAccount(address(this));
-            console.log(
-                "underlyingBalanceForAccount: ",
-                underlyingBalanceForAccount
-            );
-            // uint256 xTarotBalance = xTarot.underlying().balanceOf(
-            //     address(this)
-            // );
-            // uint256 xTarotBalance = xTarot.underlyingBalanceForAccount(
-            //     address(this)
-            // );
-            // console.log("xTarotBalance: ", xTarotBalance);
-            // IERC20 underlying = xTarot.underlying();
-            // uint256 underlyingBalance = underlying.balanceOf(address(this));
-            // console.log("underlyingBalance: ", underlyingBalance);
-            // address t = 0x74D1D2A851e339B8cB953716445Be7E8aBdf92F4;
-            // uint256 xTarotBalance = IERC20(address(xTarot)).balanceOf(
-            //     address(this)
-            // );
-            // console.log("xTarotBalance: ", xTarotBalance);
-            // uint256 eh = IERC20(tarot).balanceOf(
-            //     0x74D1D2A851e339B8cB953716445Be7E8aBdf92F4
-            // );
-            // console.log("eh: ", eh);
-            // uint256 sUnd = xTarot.shareValuedAsUnderlying(xTarotBalance);
-            // console.log("sUnd: ", sUnd);
-            // uint256 what = _share.mul(boo.balanceOf(address(this))).div(
-            // totalShares
-            // );
-            // IAceLab(aceLab).deposit(currentPoolId, xBooBalance);
-            // totalPoolBalance = totalPoolBalance.add(xBooBalance);
-            // poolxBooBalance[currentPoolId] = poolxBooBalance[currentPoolId].add(
-            //     xBooBalance
-            // );
+        if (xTarotBalance != 0) {
+            _stakingControllerDeposit(currentPoolId, xTarotBalance);
         }
+    }
+
+    /**
+     * @dev Function to deposit into AceLab while keeping internal accounting
+     *      updated.
+     */
+    function _stakingControllerDeposit(uint256 _poolId, uint256 _xTarotAmount)
+        internal
+    {
+        totalPoolBalance = totalPoolBalance.add(_xTarotAmount);
+        poolxTarotBalance[_poolId] = poolxTarotBalance[_poolId].add(
+            _xTarotAmount
+        );
+        IXStakingPoolController(stakingPoolController).deposit(
+            currentPoolId,
+            _xTarotAmount
+        );
     }
 
     // function _getTotalUnderlying() private returns (uint256 totalUnderlying) {
@@ -190,37 +154,37 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
     //     }
     // }
 
-    function _getTotalUnderlying() private returns (uint256 totalUnderlying) {
-        totalUnderlying = IERC20(0xC5e2B037D30a390e62180970B3aa4E91868764cD)
-            .balanceOf(0x74D1D2A851e339B8cB953716445Be7E8aBdf92F4);
+    // function _getTotalUnderlying() private returns (uint256 totalUnderlying) {
+    //     totalUnderlying = IERC20(0xC5e2B037D30a390e62180970B3aa4E91868764cD)
+    //         .balanceOf(0x74D1D2A851e339B8cB953716445Be7E8aBdf92F4);
 
-        uint256 numBorrowables = xTarot.getBorrowablesLength();
-        for (uint256 i = 0; i < numBorrowables; i++) {
-            IBorrowable borrowable = xTarot.borrowables(i);
-            totalUnderlying = totalUnderlying.add(
-                myUnderlyingBalance(borrowable)
-            );
-        }
-    }
+    //     uint256 numBorrowables = xTarot.getBorrowablesLength();
+    //     for (uint256 i = 0; i < numBorrowables; i++) {
+    //         IBorrowable borrowable = xTarot.borrowables(i);
+    //         totalUnderlying = totalUnderlying.add(
+    //             myUnderlyingBalance(borrowable)
+    //         );
+    //     }
+    // }
 
-    function underlyingValueOf(IBorrowable borrowable, uint256 borrowableAmount)
-        internal
-        returns (uint256)
-    {
-        if (borrowableAmount == 0) {
-            return 0;
-        }
-        uint256 exchangeRate = borrowable.exchangeRate();
-        return borrowableAmount.mul(exchangeRate).div(1e18);
-    }
+    // function underlyingValueOf(IBorrowable borrowable, uint256 borrowableAmount)
+    //     internal
+    //     returns (uint256)
+    // {
+    //     if (borrowableAmount == 0) {
+    //         return 0;
+    //     }
+    //     uint256 exchangeRate = borrowable.exchangeRate();
+    //     return borrowableAmount.mul(exchangeRate).div(1e18);
+    // }
 
-    function myUnderlyingBalance(IBorrowable borrowable)
-        internal
-        returns (uint256)
-    {
-        return
-            underlyingValueOf(borrowable, borrowable.balanceOf(address(this)));
-    }
+    // function myUnderlyingBalance(IBorrowable borrowable)
+    //     internal
+    //     returns (uint256)
+    // {
+    //     return
+    //         underlyingValueOf(borrowable, borrowable.balanceOf(address(this)));
+    // }
 
     /**
      * @dev Withdraws funds and sents them back to the vault.
@@ -502,45 +466,22 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      * It takes into account both the funds in hand, as the funds allocated in xBoo and the AceLab pools.
      */
     function balanceOf() public view override returns (uint256) {
-        uint256 balance = balanceOfTarot().add(
-            balanceOfxTarot().add(balanceOfPool())
-        );
+        uint256 balance = balanceOfxTarot().add(balanceOfPool());
         return balance;
     }
 
     /**
      * @dev It calculates how much {boo} the contract holds.
      */
-    function balanceOfTarot() public view returns (uint256) {
-        return IERC20(tarot).balanceOf(address(this));
-    }
-
-    /**
-     * @dev It calculates how much {boo} the contract has staked as xBoo.
-     */
     function balanceOfxTarot() public view returns (uint256) {
-        // uint256 xTarotBalance = xTarot.(
-        //         address(this)
-        //     );
-        //     console.log("xTarotBalance: ", xTarotBalance);
-        //     IERC20 underlying = xTarot.underlying();
-        //     uint256 underlyingBalance = underlying.balanceOf(address(this));
-        //     console.log("underlyingBalance: ", underlyingBalance);
-        // address t = 0x74D1D2A851e339B8cB953716445Be7E8aBdf92F4;
-        // uint256 tBalance = IERC20(address(xTarot)).balanceOf(address(this));
-        // console.log("tBalance: ", tBalance);
-        // uint256 sUnd = xTarot.shareValuedAsUnderlying(tBalance);
-        // console.log("sUnd: ", sUnd);
-        return 0;
-        // return IBooMirrorWorld(xBoo).BOOBalance(address(this));
+        return IERC20(xTarot).balanceOf(address(this));
     }
 
     /**
      * @dev It calculates how much {boo} the strategy has allocated in the AceLab pools
      */
     function balanceOfPool() public view returns (uint256) {
-        return 0;
-        // return IBooMirrorWorld(xBoo).xBOOForBOO(totalPoolBalance);
+        return totalPoolBalance;
     }
 
     /**
@@ -605,24 +546,9 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      * in addition to allowance to all pool rewards for the {uniRouter}.
      */
     function _giveAllowances() internal {
-        address _xTarot = address(xTarot.underlying());
-        // Give xBOO permission to use Boo
-        IERC20(tarot).safeApprove(_xTarot, 0);
-        IERC20(tarot).safeApprove(_xTarot, type(uint256).max);
-
-        address sRouter = 0x3E9F34309B2f046F4f43c0376EFE2fdC27a10251;
-        IERC20(tarot).safeApprove(sRouter, 0);
-        IERC20(tarot).safeApprove(sRouter, type(uint256).max);
-
-        IERC20(address(xTarot)).safeApprove(sRouter, 0);
-        IERC20(address(xTarot)).safeApprove(sRouter, type(uint256).max);
-
         // // Give xBoo contract permission to stake xBoo
-        // xTarot.underlying().safeApprove(stakingPoolController, 0);
-        // xTarot.underlying().safeApprove(
-        //     stakingPoolController,
-        //     type(uint256).max
-        // );
+        IERC20(xTarot).safeApprove(stakingPoolController, 0);
+        IERC20(xTarot).safeApprove(stakingPoolController, type(uint256).max);
         // Give uniRouter permission to swap wftm to boo
         IERC20(wftm).safeApprove(uniRouter, 0);
         IERC20(wftm).safeApprove(uniRouter, type(uint256).max);
@@ -637,7 +563,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      */
     function _removeAllowances() internal {
         // Give xBOO permission to use Boo
-        // IERC20(tarot).safeApprove(xTarot, 0);
+        // IERC20(xTarot).safeApprove(xTarot, 0);
         // // Give xBoo contract permission to stake xBoo
         // IERC20(xTarot).safeApprove(stakingPoolController, 0);
         // // Give uniRouter permission to swap wftm to boo

@@ -24,7 +24,7 @@ describe("Vaults", function () {
   let vault;
   let strategy;
   let treasury;
-  let tarot;
+  let xTarot;
   const tarotSupplyVaultRouter01 = "0x3E9F34309B2f046F4f43c0376EFE2fdC27a10251";
   const tarotAddress = "0xC5e2B037D30a390e62180970B3aa4E91868764cD";
   const xTarotAddress = "0x74D1D2A851e339B8cB953716445Be7E8aBdf92F4";
@@ -45,7 +45,7 @@ describe("Vaults", function () {
         {
           forking: {
             jsonRpcUrl: "https://rpc.ftm.tools/",
-            blockNumber: 27286307,
+            blockNumber: 27945439,
           },
         },
       ],
@@ -53,20 +53,20 @@ describe("Vaults", function () {
     console.log("providers");
     //   //get signers
     [owner, addr1, addr2, addr3, addr4, ...addrs] = await ethers.getSigners();
-    const tarotHolder = "0x71fd2e07d2741c5d5b93dd4c20848c92364e6331";
-    const tarotWhaleAddress = "0xa1696fec3b2806a850373d91082aa6ad4759db60";
+    const xTarotHolder = "0x7ea2d94c0bb347014db4c08e70fac5f67793ffe0";
+    const xTarotWhaleAddress = "0x95b4de84579c71212000e26ba390377e4c4357a7";
     await hre.network.provider.request({
       method: "hardhat_impersonateAccount",
-      params: [tarotHolder],
+      params: [xTarotHolder],
     });
     await hre.network.provider.request({
       method: "hardhat_impersonateAccount",
-      params: [tarotWhaleAddress],
+      params: [xTarotWhaleAddress],
     });
-    self = await ethers.provider.getSigner(tarotHolder);
-    tarotWhale = await ethers.provider.getSigner(tarotWhaleAddress);
+    self = await ethers.provider.getSigner(xTarotHolder);
+    tarotWhale = await ethers.provider.getSigner(xTarotWhaleAddress);
     await self.sendTransaction({
-      to: tarotWhaleAddress,
+      to: xTarotWhaleAddress,
       value: ethers.utils.parseEther("1"),
     });
     selfAddress = await self.getAddress();
@@ -76,7 +76,9 @@ describe("Vaults", function () {
     Strategy = await ethers.getContractFactory("ReaperAutoCompoundTarot");
     Vault = await ethers.getContractFactory("ReaperVaultv1_3");
     Treasury = await ethers.getContractFactory("ReaperTreasury");
-    Tarot = await ethers.getContractFactory("Tarot");
+    XTarot = await ethers.getContractFactory(
+      "@openzeppelin/contracts/token/ERC20/ERC20.sol:ERC20"
+    );
     XStakingPoolController = await ethers.getContractFactory(
       "XStakingPoolController"
     );
@@ -84,13 +86,13 @@ describe("Vaults", function () {
     //deploy contracts
     treasury = await Treasury.deploy();
     console.log("treasury");
-    tarot = await Tarot.attach(tarotAddress);
+    xTarot = await XTarot.attach(xTarotAddress);
     xStakingPoolController = await XStakingPoolController.attach(
       XStakingPoolControllerAddress
     );
     console.log("tarot attached");
     vault = await Vault.deploy(
-      tarotAddress,
+      xTarotAddress,
       "XTAROT Single Stake Vault",
       "rfXTAROT",
       432000,
@@ -121,11 +123,11 @@ describe("Vaults", function () {
     console.log(`Vault deployed to ${vault.address}`);
     console.log(`Treasury deployed to ${treasury.address}`);
     //approving LP token and vault share spend
-    await tarot.approve(vault.address, ethers.utils.parseEther("1000000000"));
+    await xTarot.approve(vault.address, ethers.utils.parseEther("1000000000"));
     console.log("approvals1");
     await vault.approve(vault.address, ethers.utils.parseEther("1000000000"));
     console.log("approvals2");
-    await tarot
+    await xTarot
       .connect(self)
       .approve(vault.address, ethers.utils.parseEther("1000000000"));
     console.log("approvals3");
@@ -133,7 +135,7 @@ describe("Vaults", function () {
       .connect(self)
       .approve(vault.address, ethers.utils.parseEther("1000000000"));
     console.log("approvals4");
-    await tarot
+    await xTarot
       .connect(tarotWhale)
       .approve(vault.address, ethers.utils.parseEther("1000000000"));
     console.log("approvals5");
@@ -160,7 +162,7 @@ describe("Vaults", function () {
   });
   describe("Vault Tests", function () {
     it("should allow deposits and account for them correctly", async function () {
-      const userBalance = await tarot.balanceOf(selfAddress);
+      const userBalance = await xTarot.balanceOf(selfAddress);
       console.log(1);
       console.log(`userBalance: ${userBalance}`);
       const vaultBalance = await vault.balance();
@@ -176,8 +178,7 @@ describe("Vaults", function () {
       const newVaultBalance = await vault.balance();
       console.log(`newVaultBalance: ${newVaultBalance}`);
       console.log(`depositAmount: ${depositAmount}`);
-      const newUserBalance = await tarot.balanceOf(selfAddress);
-
+      const newUserBalance = await xTarot.balanceOf(selfAddress);
       console.log(`newUserBalance: ${newUserBalance}`);
       console.log(
         `userBalance - depositAmount: ${userBalance - depositAmount}`
@@ -194,7 +195,7 @@ describe("Vaults", function () {
     });
     xit("should mint user their pool share", async function () {
       console.log("---------------------------------------------");
-      const userBalance = await tarot.balanceOf(selfAddress);
+      const userBalance = await xTarot.balanceOf(selfAddress);
       console.log(userBalance.toString());
       const selfDepositAmount = ethers.utils.parseEther("0.005");
       await vault.connect(self).deposit(selfDepositAmount);
@@ -207,8 +208,8 @@ describe("Vaults", function () {
       // const selfBooBalance = await vault.balanceOf(selfAddress);
       // console.log(selfBooBalance.toString());
       const ownerDepositAmount = ethers.utils.parseEther("5");
-      await tarot.connect(self).transfer(ownerAddress, ownerDepositAmount);
-      const ownerBalance = await tarot.balanceOf(ownerAddress);
+      await xTarot.connect(self).transfer(ownerAddress, ownerDepositAmount);
+      const ownerBalance = await xTarot.balanceOf(ownerAddress);
 
       console.log(ownerBalance.toString());
       await vault.deposit(ownerDepositAmount);
@@ -216,7 +217,7 @@ describe("Vaults", function () {
       const ownerVaultTarotBalance = await vault.balanceOf(ownerAddress);
       console.log(ownerVaultTarotBalance.toString());
       await vault.withdraw(ownerVaultTarotBalance);
-      const ownerTarotBalance = await tarot.balanceOf(ownerAddress);
+      const ownerTarotBalance = await xTarot.balanceOf(ownerAddress);
       console.log(`ownerTarotBalance: ${ownerTarotBalance}`);
       const ownerVaultTarotBalanceAfterWithdraw = await vault.balanceOf(
         ownerAddress
@@ -233,25 +234,25 @@ describe("Vaults", function () {
       const depositAmount = ethers.BigNumber.from(ethers.utils.parseEther("1"));
       await vault.connect(self).deposit(depositAmount);
       console.log(
-        `await tarot.balanceOf(selfAddress): ${await tarot.balanceOf(
+        `await tarot.balanceOf(selfAddress): ${await xTarot.balanceOf(
           selfAddress
         )}`
       );
       const whaleDepositAmount = ethers.utils.parseEther("100");
       await vault.connect(tarotWhale).deposit(whaleDepositAmount);
       const newUserBalance = userBalance.sub(depositAmount);
-      const tokenBalance = await tarot.balanceOf(selfAddress);
+      const tokenBalance = await xTarot.balanceOf(selfAddress);
       const balanceDifferenceIsZero = tokenBalance.sub(newUserBalance).isZero();
       expect(balanceDifferenceIsZero).to.equal(true);
       await vault.connect(self).withdraw(depositAmount);
       console.log(
-        `await tarot.balanceOf(selfAddress): ${await tarot.balanceOf(
+        `await tarot.balanceOf(selfAddress): ${await xTarot.balanceOf(
           selfAddress
         )}`
       );
       const newUserVaultBalance = await vault.balanceOf(selfAddress);
       console.log(`newUserVaultBalance: ${newUserVaultBalance}`);
-      const userBalanceAfterWithdraw = await tarot.balanceOf(selfAddress);
+      const userBalanceAfterWithdraw = await xTarot.balanceOf(selfAddress);
       const securityFee = 10;
       const percentDivisor = 10000;
       const withdrawFee = (depositAmount * securityFee) / percentDivisor;
