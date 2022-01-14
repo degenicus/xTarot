@@ -145,7 +145,7 @@ describe("Vaults", function () {
   });
 
   describe("Deploying the vault and strategy", function () {
-    xit("should initiate vault with a 0 balance", async function () {
+    it("should initiate vault with a 0 balance", async function () {
       console.log(1);
       const totalBalance = await vault.balance();
       console.log(2);
@@ -193,43 +193,26 @@ describe("Vaults", function () {
       expect(depositAmount).to.equal(newVaultBalance);
       expect(deductedAmount).to.equal(depositAmount);
     });
-    xit("should mint user their pool share", async function () {
-      console.log("---------------------------------------------");
+    it("should mint user their pool share", async function () {
       const userBalance = await xTarot.balanceOf(selfAddress);
       console.log(userBalance.toString());
-      const selfDepositAmount = ethers.utils.parseEther("0.005");
-      await vault.connect(self).deposit(selfDepositAmount);
+      const depositAmount = ethers.utils.parseEther("0.0000005");
+      await vault.connect(self).deposit(depositAmount);
       console.log((await vault.balance()).toString());
-
-      const whaleDepositAmount = ethers.utils.parseEther("100");
-      await vault.connect(tarotWhale).deposit(whaleDepositAmount);
-      console.log((await vault.balance()).toString());
-      // console.log((await boo.balanceOf(selfAddress)).toString());
-      // const selfBooBalance = await vault.balanceOf(selfAddress);
-      // console.log(selfBooBalance.toString());
-      const ownerDepositAmount = ethers.utils.parseEther("5");
-      await xTarot.connect(self).transfer(ownerAddress, ownerDepositAmount);
+      console.log((await xTarot.balanceOf(selfAddress)).toString());
+      const selfShareBalance = await vault.balanceOf(selfAddress);
+      console.log(selfShareBalance.toString());
+      await xTarot.connect(self).transfer(ownerAddress, depositAmount);
       const ownerBalance = await xTarot.balanceOf(ownerAddress);
-
       console.log(ownerBalance.toString());
-      await vault.deposit(ownerDepositAmount);
-      console.log((await vault.balance()).toString());
-      const ownerVaultTarotBalance = await vault.balanceOf(ownerAddress);
-      console.log(ownerVaultTarotBalance.toString());
-      await vault.withdraw(ownerVaultTarotBalance);
-      const ownerTarotBalance = await xTarot.balanceOf(ownerAddress);
-      console.log(`ownerTarotBalance: ${ownerTarotBalance}`);
-      const ownerVaultTarotBalanceAfterWithdraw = await vault.balanceOf(
-        ownerAddress
-      );
-      console.log(
-        `ownerVaultTarotBalanceAfterWithdraw: ${ownerVaultTarotBalanceAfterWithdraw}`
-      );
-      expect(ownerTarotBalance).to.equal(ownerDepositAmount);
-      expect(selfTarotBalance).to.equal(selfDepositAmount);
+      await vault.deposit(depositAmount);
+      const ownerShareBalance = await vault.balanceOf(ownerAddress);
+      console.log(ownerShareBalance.toString());
+      expect(ownerShareBalance).to.equal(depositAmount);
+      expect(selfShareBalance).to.equal(depositAmount);
     });
-    xit("should allow withdrawals", async function () {
-      const userBalance = await boo.balanceOf(selfAddress);
+    it("should allow withdrawals", async function () {
+      const userBalance = await xTarot.balanceOf(selfAddress);
       console.log(`userBalance: ${userBalance}`);
       const depositAmount = ethers.BigNumber.from(ethers.utils.parseEther("1"));
       await vault.connect(self).deposit(depositAmount);
