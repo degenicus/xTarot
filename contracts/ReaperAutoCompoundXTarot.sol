@@ -609,45 +609,48 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
     }
 
     /**
-     * @dev Removes all allowance of {XTAROT} for the {xBoo} contract,
-     * {xBoo} allowance for the {POOL_CONTROLLER} contract,
-     * {WFTM} allowance for the {UNI_ROUTER}
-     * in addition to allowance to all pool rewards for the {UNI_ROUTER}.
+     * @dev Removes all allowance of {stakingToken} for the {xToken} contract,
+     * {xToken} allowance for the {aceLab} contract,
+     * {wftm} allowance for the {uniRouter}
+     * in addition to allowance to all pool rewards for the {uniRouter}.
      */
     function _removeAllowances() internal {
-        // Give xBOO permission to use Boo
-        // IERC20(XTAROT).safeApprove(XTAROT, 0);
-        // // Give xBoo contract permission to stake xBoo
-        // IERC20(XTAROT).safeApprove(POOL_CONTROLLER, 0);
-        // // Give UNI_ROUTER permission to swap WFTM to XTAROT
-        // IERC20(WFTM).safeApprove(UNI_ROUTER, 0);
-        // _removePoolAllowances();
+        // Remove xBoo contract permission to stake xBoo
+        IERC20(TAROT).safeApprove(address(XTAROT), 0);
+        // Remove xBoo contract permission to stake xBoo
+        IERC20(XTAROT).safeApprove(POOL_CONTROLLER, 0);
+        // Remove UNI_ROUTER permission to swap WFTM to XTAROT
+        IERC20(WFTM).safeApprove(UNI_ROUTER, 0);
+        _removePoolAllowances();
     }
 
     /**
      * @dev Gives max allowance to all pool rewards for the {UNI_ROUTER}.
      */
     function _givePoolAllowances() internal {
-        // for (uint256 index = 0; index < currentlyUsedPools.length; index++) {
-        //     IERC20 rewardToken = IXStakingPoolController(POOL_CONTROLLER)
-        //         .poolInfo(currentlyUsedPools[index])
-        //         .RewardToken;
-        //     rewardToken.safeApprove(UNI_ROUTER, 0);
-        //     rewardToken.safeApprove(UNI_ROUTER, type(uint256).max);
-        // }
+        for (uint256 index = 0; index < currentlyUsedPools.length; index++) {
+            address[] storage rewardToWftmPaths = poolRewardToWftmPaths[
+                currentlyUsedPools[index]
+            ];
+            IERC20 underlyingRewardToken = IERC20(rewardToWftmPaths[0]);
+
+            underlyingRewardToken.safeApprove(UNI_ROUTER, 0);
+            underlyingRewardToken.safeApprove(UNI_ROUTER, type(uint256).max);
+        }
     }
 
     /**
      * @dev Removes all allowance to all pool rewards for the {UNI_ROUTER}.
      */
     function _removePoolAllowances() internal {
-        // for (uint256 index = 0; index < currentlyUsedPools.length; index++) {
-        //     uint8 poolId = currentlyUsedPools[index];
-        //     IXStakingPoolController(POOL_CONTROLLER).poolInfo(poolId).RewardToken.safeApprove(
-        //         UNI_ROUTER,
-        //         0
-        //     );
-        // }
+        for (uint256 index = 0; index < currentlyUsedPools.length; index++) {
+            address[] storage rewardToWftmPaths = poolRewardToWftmPaths[
+                currentlyUsedPools[index]
+            ];
+            IERC20 underlyingRewardToken = IERC20(rewardToWftmPaths[0]);
+
+            underlyingRewardToken.safeApprove(UNI_ROUTER, 0);
+        }
     }
 
     /**
