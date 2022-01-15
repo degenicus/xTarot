@@ -359,87 +359,44 @@ describe("Vaults", function () {
       expect(hasCallFee).to.equal(true);
     });
     xit("should be able to check internal accounting", async function () {
-      const bigWhaleDepositAmount = ethers.utils.parseEther("133728");
-      await vault.connect(bigBooWhale).deposit(bigWhaleDepositAmount);
+      const whaleDepositAmount = ethers.utils.parseEther("133728");
+      await vault.connect(xTarotWhale).deposit(whaleDepositAmount);
       await strategy.harvest();
       const minute = 60;
       const hour = 60 * minute;
       const day = 24 * hour;
       await moveTimeForward(10 * day);
-      await updatePools(acelab);
+      await updatePools(xStakingPoolController);
       const isAccurate = await strategy.isInternalAccountingAccurate();
       expect(isAccurate).to.equal(true);
     });
     xit("should be able to update internal accounting", async function () {
-      const bigWhaleDepositAmount = ethers.utils.parseEther("133728");
-      await vault.connect(bigBooWhale).deposit(bigWhaleDepositAmount);
+      const whaleDepositAmount = ethers.utils.parseEther("133728");
+      await vault.connect(xTarotWhale).deposit(whaleDepositAmount);
       await strategy.harvest();
       const minute = 60;
       const hour = 60 * minute;
       const day = 24 * hour;
       await moveTimeForward(10 * day);
-      await updatePools(acelab);
+      await updatePools(xStakingPoolController);
       await expect(strategy.updateInternalAccounting()).to.not.be.reverted;
     });
     xit("cannot add pools past the max cap", async function () {
-      const WFTM_ID = 2;
+      const TFTM_ID = 0;
       const WFTM = "0x21be370d5312f44cb42ce377bc9b8a0cef1a4c83";
 
-      await expect(strategy.addUsedPool(WFTM_ID, [WFTM, WFTM])).to.not.be
-        .reverted;
-      await expect(strategy.addUsedPool(WFTM_ID, [WFTM, WFTM])).to.not.be
-        .reverted;
-      await expect(strategy.addUsedPool(WFTM_ID, [WFTM, WFTM])).to.not.be
-        .reverted;
-      // Pool 16 is reverted
-      await expect(strategy.addUsedPool(WFTM_ID, [WFTM, WFTM])).to.be.reverted;
-    });
-    xit("should include xBoo gains in yield calculation", async function () {
-      const deposit = ethers.utils.parseEther("1");
-      const xBoodeposit1 = ethers.utils.parseEther("10");
-      const xBoodeposit2 = ethers.utils.parseEther("100");
-      const xBoodeposit3 = ethers.utils.parseEther("1000");
-      const xBoodeposit4 = ethers.utils.parseEther("10000");
-      const xBoodeposit5 = ethers.utils.parseEther("100000");
-      await vault.connect(bigBooWhale).deposit(deposit);
-      await strategy.harvest();
-      const minute = 60;
-      const hour = 60 * minute;
-      await moveTimeForward(13 * hour);
-      await boo.connect(bigBooWhale).transfer(xBooAddress, xBoodeposit1);
-      const [xBooProfit1] = await strategy.estimateHarvest();
-      console.log(`xBooProfit1: ${xBooProfit1}`);
-      await strategy.harvest();
-      await moveTimeForward(13 * hour);
-      await boo.connect(bigBooWhale).transfer(xBooAddress, xBoodeposit2);
-      const [xBooProfit2] = await strategy.estimateHarvest();
-      console.log(`xBooProfit2: ${xBooProfit2}`);
-      let apr = await strategy.averageAPRAcrossLastNHarvests(6);
-      console.log(`apr: ${apr}`);
-      await strategy.harvest();
-      await moveTimeForward(13 * hour);
-      await boo.connect(bigBooWhale).transfer(xBooAddress, xBoodeposit3);
-      const [xBooProfit3] = await strategy.estimateHarvest();
-      console.log(`xBooProfit3: ${xBooProfit3}`);
-      apr = await strategy.averageAPRAcrossLastNHarvests(6);
-      console.log(`apr: ${apr}`);
-      await strategy.harvest();
-      await moveTimeForward(13 * hour);
-      await boo.connect(bigBooWhale).transfer(xBooAddress, xBoodeposit4);
-      const [xBooProfit4] = await strategy.estimateHarvest();
-      console.log(`xBooProfit4: ${xBooProfit4}`);
-      apr = await strategy.averageAPRAcrossLastNHarvests(6);
-      console.log(`apr: ${apr}`);
-      await strategy.harvest();
-      await moveTimeForward(13 * hour);
-      await boo.connect(bigBooWhale).transfer(xBooAddress, xBoodeposit5);
-      const [xBooProfit5] = await strategy.estimateHarvest();
-      console.log(`xBooProfit5: ${xBooProfit5}`);
-      apr = await strategy.averageAPRAcrossLastNHarvests(6);
-      console.log(`apr: ${apr}`);
-      await strategy.harvest();
-      apr = await strategy.averageAPRAcrossLastNHarvests(6);
-      console.log(`apr: ${apr}`);
+      const maxCap = 15;
+      for (let index = 0; index < maxCap; index++) {
+        console.log(index);
+        if (index < maxCap - 1) {
+          await expect(strategy.addUsedPool(TFTM_ID, [WFTM, WFTM])).to.not.be
+            .reverted;
+        } else {
+          await expect(strategy.addUsedPool(TFTM_ID, [WFTM, WFTM])).to.be
+            .reverted;
+          console.log("reverted");
+        }
+      }
     });
   });
 });
