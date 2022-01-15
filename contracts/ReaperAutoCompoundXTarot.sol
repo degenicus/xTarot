@@ -10,7 +10,6 @@ import "./interfaces/IBorrowable.sol";
 import "./interfaces/ISupplyVault.sol";
 import "./interfaces/IXStakingPoolController.sol";
 import "./libraries/SafeERC20.sol";
-import "./libraries/SafeMath.sol";
 // import "./libraries/BorrowableHelpers.sol";
 
 import "hardhat/console.sol";
@@ -23,7 +22,6 @@ pragma solidity 0.8.9;
  */
 contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
     using SafeERC20 for IERC20;
-    using SafeMath for uint256;
 
     /**
      * @dev Tokens Used:
@@ -119,10 +117,8 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
     function _stakingControllerDeposit(uint256 _poolId, uint256 _xTarotAmount)
         internal
     {
-        totalPoolBalance = totalPoolBalance.add(_xTarotAmount);
-        poolxTarotBalance[_poolId] = poolxTarotBalance[_poolId].add(
-            _xTarotAmount
-        );
+        totalPoolBalance = totalPoolBalance + _xTarotAmount;
+        poolxTarotBalance[_poolId] = poolxTarotBalance[_poolId] + _xTarotAmount;
         IXStakingPoolController(POOL_CONTROLLER).deposit(
             currentPoolId,
             _xTarotAmount
@@ -182,14 +178,12 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
             xTarotBalance = _amount;
         }
 
-        uint256 withdrawFee = xTarotBalance.mul(securityFee).div(
-            PERCENT_DIVISOR
-        );
+        uint256 withdrawFee = (xTarotBalance * securityFee) / PERCENT_DIVISOR;
         console.log(
-            "xTarotBalance.sub(withdrawFee): ",
-            xTarotBalance.sub(withdrawFee)
+            "xTarotBalance - withdrawFee: ",
+            xTarotBalance - withdrawFee
         );
-        IERC20(XTAROT).safeTransfer(vault, xTarotBalance.sub(withdrawFee));
+        IERC20(XTAROT).safeTransfer(vault, xTarotBalance - withdrawFee);
     }
 
     /**
@@ -199,10 +193,8 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
     function _stakingControllerWithdraw(uint256 _poolId, uint256 _xTokenAmount)
         internal
     {
-        totalPoolBalance = totalPoolBalance.sub(_xTokenAmount);
-        poolxTarotBalance[_poolId] = poolxTarotBalance[_poolId].sub(
-            _xTokenAmount
-        );
+        totalPoolBalance = totalPoolBalance - _xTokenAmount;
+        poolxTarotBalance[_poolId] = poolxTarotBalance[_poolId] - _xTokenAmount;
         IXStakingPoolController(POOL_CONTROLLER).withdraw(
             _poolId,
             _xTokenAmount
@@ -219,7 +211,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
             (uint256 amount, ) = IXStakingPoolController(POOL_CONTROLLER)
                 .userInfo(_poolId, address(this));
             uint256 internalBalance = poolxTarotBalance[_poolId];
-            total = total.add(amount);
+            total = total + amount;
             if (amount != internalBalance) {
                 return false;
             }
@@ -242,7 +234,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
             (uint256 amount, ) = IXStakingPoolController(POOL_CONTROLLER)
                 .userInfo(_poolId, address(this));
             poolxTarotBalance[_poolId] = amount;
-            total = total.add(amount);
+            total = total + amount;
         }
         totalPoolBalance = total;
         return true;
@@ -282,21 +274,21 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
             }
 
             if (poolRewardToWftmPaths[poolId][0] == WFTM) {
-                profit = profit.add(pendingReward);
+                profit = profit + pendingReward;
             } else {
                 uint256[] memory amountOutMins = IUniswapRouterETH(UNI_ROUTER)
                     .getAmountsOut(
                         pendingReward,
                         poolRewardToWftmPaths[poolId]
                     );
-                profit = profit.add(amountOutMins[1]);
+                profit = profit + amountOutMins[1];
             }
         }
 
         // // take out fees from profit
-        uint256 wftmFee = profit.mul(totalFee).div(PERCENT_DIVISOR);
-        callFeeToUser = wftmFee.mul(callFee).div(PERCENT_DIVISOR);
-        profit = profit.sub(wftmFee);
+        uint256 wftmFee = (profit * totalFee) / PERCENT_DIVISOR;
+        callFeeToUser = (wftmFee * callFee) / PERCENT_DIVISOR;
+        profit = profit - wftmFee;
     }
 
     /**
@@ -347,7 +339,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
                     0,
                     rewardToWftmPaths,
                     address(this),
-                    block.timestamp.add(10)
+                    block.timestamp + 10
                 );
         }
     }
@@ -367,10 +359,10 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
         // Look forward in time by the same time it took between the previous and current harvest
         uint256 _to = block.timestamp;
         if (lastHarvestTimestamp != 0) {
-            _to = _to.add(block.timestamp).sub(lastHarvestTimestamp);
+            _to = _to + block.timestamp - lastHarvestTimestamp;
         } else {
             // Default when timestamp is missing
-            _to = _to.add(1 days);
+            _to = _to + 1 days;
         }
         // Total seconds the pool will receive rewards up to the next harvest (when strategy rebalances)
         uint256 multiplier = _getMultiplier(_from, _to, poolInfo);
@@ -433,18 +425,15 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
         if (wftmBalance == 0) {
             return;
         }
-        uint256 wftmFee = wftmBalance.mul(totalFee).div(PERCENT_DIVISOR);
+        uint256 wftmFee = (wftmBalance * totalFee) / PERCENT_DIVISOR;
         console.log("wftmFee: ", wftmFee);
-        uint256 callFeeToUser = wftmFee.mul(callFee).div(PERCENT_DIVISOR);
+        uint256 callFeeToUser = (wftmFee * callFee) / PERCENT_DIVISOR;
 
-        uint256 treasuryFeeToVault = wftmFee.mul(treasuryFee).div(
-            PERCENT_DIVISOR
-        );
+        uint256 treasuryFeeToVault = (wftmFee * treasuryFee) / PERCENT_DIVISOR;
 
-        uint256 feeToStrategist = treasuryFeeToVault.mul(strategistFee).div(
-            PERCENT_DIVISOR
-        );
-        treasuryFeeToVault = treasuryFeeToVault.sub(feeToStrategist);
+        uint256 feeToStrategist = (treasuryFeeToVault * strategistFee) /
+            PERCENT_DIVISOR;
+        treasuryFeeToVault = treasuryFeeToVault - feeToStrategist;
         console.log("feeToStrategist: ", feeToStrategist);
         console.log("treasuryFeeToVault: ", treasuryFeeToVault);
 
@@ -465,7 +454,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
                     0,
                     wftmToTarotRoute,
                     address(this),
-                    block.timestamp.add(10)
+                    block.timestamp + 10
                 );
             tarotBalance = IERC20(TAROT).balanceOf(address(this));
         }
@@ -507,18 +496,17 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
             IXStakingPoolController.PoolInfo
                 memory poolInfo = IXStakingPoolController(POOL_CONTROLLER)
                     .poolInfo(bestYieldPoolId);
-            bool isLastPool = currentlyUsedPools.length.sub(nrOfDeposits) == 1;
+            bool isLastPool = currentlyUsedPools.length - nrOfDeposits == 1;
             if (
                 !isLastPool &&
                 poolDepositAmount >
-                (poolInfo.xTAROTStakedAmount.div(maxPoolDilutionFactor))
+                (poolInfo.xTAROTStakedAmount / maxPoolDilutionFactor)
             ) {
-                poolDepositAmount = (
-                    poolInfo.xTAROTStakedAmount.div(maxPoolDilutionFactor)
-                );
+                poolDepositAmount = (poolInfo.xTAROTStakedAmount /
+                    maxPoolDilutionFactor);
             }
             hasAllocatedToPool[bestYieldPoolId] = true;
-            nrOfDeposits = nrOfDeposits.add(1);
+            nrOfDeposits = nrOfDeposits + 1;
             _stakingControllerDeposit(bestYieldPoolId, poolDepositAmount);
             xTarotBalance = XTAROT.balanceOf(address(this));
             currentPoolId = bestYieldPoolId;
@@ -530,7 +518,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      * It takes into account both the funds in hand, as the funds allocated in xBoo and the XStakingPoolController pools.
      */
     function balanceOf() public view override returns (uint256) {
-        uint256 balance = balanceOfxTarot().add(balanceOfPool());
+        uint256 balance = balanceOfxTarot() + balanceOfPool();
         return balance;
     }
 
