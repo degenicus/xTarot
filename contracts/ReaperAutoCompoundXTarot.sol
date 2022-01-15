@@ -670,23 +670,20 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
     /**
      * @dev Removes a pool that will no longer be used.
      */
-    function removeUsedPool(uint8 _poolIndex) external {
-        // _onlyStrategistOrOwner();
-        // uint8 poolId = currentlyUsedPools[_poolIndex];
-        // if (currentPoolId == poolId) {
-        //     currentPoolId = WFTM_POOL_ID;
-        // }
-        // IXStakingPoolController(stakingPoolController).poolInfo(poolId).RewardToken.safeApprove(uniRouter, 0);
-        // uint256 balance = poolxTarotBalance[poolId];
-        // IXStakingPoolController(stakingPoolController).withdraw(poolId, balance);
-        // totalPoolBalance = totalPoolBalance.sub(balance);
-        // poolxTarotBalance[poolId] = 0;
-        // uint256 lastPoolIndex = currentlyUsedPools.length - 1;
-        // uint8 lastPoolId = currentlyUsedPools[lastPoolIndex];
-        // currentlyUsedPools[_poolIndex] = lastPoolId;
-        // currentlyUsedPools.pop();
-        // if (poolId == WFTM_POOL_ID) {
-        //     currentPoolId = currentlyUsedPools[0];
-        // }
+    function removeUsedPool(uint256 _poolIndex) external {
+        _onlyStrategistOrOwner();
+        uint256 poolId = currentlyUsedPools[_poolIndex];
+        IERC20(poolRewardToWftmPaths[poolId][0]).safeApprove(uniRouter, 0);
+        uint256 balance = poolxTarotBalance[poolId];
+        _stakingControllerWithdraw(poolId, balance);
+        uint256 lastPoolIndex = currentlyUsedPools.length - 1;
+        uint256 lastPoolId = currentlyUsedPools[lastPoolIndex];
+        currentlyUsedPools[_poolIndex] = lastPoolId;
+        currentlyUsedPools.pop();
+
+        if (currentPoolId == poolId) {
+            currentPoolId = currentlyUsedPools[0];
+        }
+        _stakingControllerDeposit(currentPoolId, balance);
     }
 }

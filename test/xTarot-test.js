@@ -244,7 +244,7 @@ describe("Vaults", function () {
     xit("should be able to harvest", async function () {
       await strategy.connect(self).harvest();
     });
-    it("should provide yield", async function () {
+    xit("should provide yield", async function () {
       await strategy.connect(self).harvest();
       const depositAmount = ethers.utils.parseEther(".05");
       await vault.connect(self).deposit(depositAmount);
@@ -272,84 +272,172 @@ describe("Vaults", function () {
       expect(hasYield).to.equal(true);
     });
   });
-  // describe("Strategy", function () {
-  //   xit("should be able to remove a pool", async function () {
-  //     await strategy.connect(self).harvest();
-  //     const bigWhaleDepositAmount = ethers.utils.parseEther("327171");
-  //     await vault.connect(bigBooWhale).deposit(bigWhaleDepositAmount);
-  //     await strategy.connect(self).harvest();
+  describe("Strategy", function () {
+    xit("should be able to remove a pool", async function () {
+      await strategy.connect(self).harvest();
+      const whaleDepositAmount = ethers.utils.parseEther("133728");
+      await vault.connect(xTarotWhale).deposit(whaleDepositAmount);
+      await strategy.connect(self).harvest();
 
-  //     const treebPoolId = 9;
-  //     const treebIndex = 3;
-  //     const treebPoolBalance = await strategy.poolxBooBalance(treebPoolId);
-  //     console.log(`treebPoolBalance: ${treebPoolBalance}`);
-  //     const vaultBalance = await vault.balance();
+      const wftmPoolId = 0;
+      const wftmIndex = 0;
+      const wftmPoolBalance = await strategy.poolxTarotBalance(wftmPoolId);
+      console.log(`wftmPoolBalance: ${wftmPoolBalance}`);
+      const vaultBalance = await vault.balance();
 
-  //     const tx = await strategy.removeUsedPool(treebIndex);
-  //     await tx.wait();
+      const tx = await strategy.removeUsedPool(wftmIndex);
+      await tx.wait();
 
-  //     const newVaultBalance = await vault.balance();
-  //     const newTreebPoolBalance = await strategy.poolxBooBalance(treebPoolId);
-  //     console.log(`newTreebPoolBalance: ${newTreebPoolBalance}`);
+      const newVaultBalance = await vault.balance();
+      const newWftmPoolBalance = await strategy.poolxTarotBalance(wftmPoolId);
+      console.log(`newWftmPoolBalance: ${newWftmPoolBalance}`);
 
-  //     // Make sure harvest can run without error after removing
-  //     await strategy.connect(self).harvest();
+      // Make sure harvest can run without error after removing
+      await strategy.connect(self).harvest();
+      console.log(`vaultBalance: ${vaultBalance}`);
+      console.log(`newVaultBalance: ${newVaultBalance}`);
 
-  //     expect(newTreebPoolBalance).to.equal(0);
-  //     expect(vaultBalance).to.equal(newVaultBalance);
-  //   });
-  //   xit("should be able to pause and unpause", async function () {
-  //     await strategy.pause();
-  //     const depositAmount = ethers.utils.parseEther(".05");
-  //     await expect(vault.connect(self).deposit(depositAmount)).to.be.reverted;
-  //     await strategy.unpause();
-  //     await expect(vault.connect(self).deposit(depositAmount)).to.not.be
-  //       .reverted;
-  //   });
-  //   xit("should be able to panic", async function () {
-  //     const depositAmount = ethers.utils.parseEther(".05");
-  //     await vault.connect(self).deposit(depositAmount);
-  //     const vaultBalance = await vault.balance();
-  //     const strategyBalance = await strategy.balanceOf();
-  //     await strategy.panic();
-  //     const newVaultBalance = await vault.balance();
-  //     const newStrategyBalance = await strategy.balanceOf();
-  //     expect(vaultBalance).to.equal(strategyBalance);
-  //     // Accounting is not updated when panicking so newVaultBalance is 2x expected
-  //     //expect(newVaultBalance).to.equal(vaultBalance);
-  //     // It looks like the strategy still has balance because panic does not update balance
-  //     //expect(newStrategyBalance).to.equal(0);
-  //   });
-  //   xit("should be able to retire strategy", async function () {
-  //     // Test needs the require statement to be commented out during the test
-  //     const depositAmount = ethers.utils.parseEther(".05");
-  //     await vault.connect(self).deposit(depositAmount);
-  //     const vaultBalance = await vault.balance();
-  //     const strategyBalance = await strategy.balanceOf();
-  //     await strategy.retireStrat();
-  //     const newVaultBalance = await vault.balance();
-  //     const newStrategyBalance = await strategy.balanceOf();
-  //     // const userBalance = await vault.balanceOf(selfAddress);
-  //     // console.log(`userBalance: ${userBalance}`);
-  //     // await vault.connect(self).withdraw(userBalance);
-  //     expect(vaultBalance).to.equal(strategyBalance);
-  //     // expect(newVaultBalance).to.equal(vaultBalance);
-  //     expect(newStrategyBalance).to.equal(0);
-  //   });
-  //   it("should be able to estimate harvest", async function () {
-  //     const bigWhaleDepositAmount = ethers.utils.parseEther("327171");
-  //     await vault.connect(bigBooWhale).deposit(bigWhaleDepositAmount);
-  //     await strategy.harvest();
-  //     const minute = 60;
-  //     const hour = 60 * minute;
-  //     const day = 24 * hour;
-  //     await moveTimeForward(10 * day);
-  //     await updatePools(xStakingPoolController);
-  //     const [profit, callFeeToUser] = await strategy.estimateHarvest();
-  //     const hasProfit = profit.gt(0);
-  //     const hasCallFee = callFeeToUser.gt(0);
-  //     expect(hasProfit).to.equal(true);
-  //     expect(hasCallFee).to.equal(true);
-  //   });
-  // });
+      const isSmallBalanceDifference =
+        Math.abs(vaultBalance.sub(newVaultBalance)) < 5;
+
+      expect(newWftmPoolBalance).to.equal(0);
+      expect(isSmallBalanceDifference).to.equal(true);
+    });
+    xit("should be able to pause and unpause", async function () {
+      await strategy.pause();
+      const depositAmount = ethers.utils.parseEther(".05");
+      await expect(vault.connect(self).deposit(depositAmount)).to.be.reverted;
+      await strategy.unpause();
+      await expect(vault.connect(self).deposit(depositAmount)).to.not.be
+        .reverted;
+    });
+    xit("should be able to panic", async function () {
+      const depositAmount = ethers.utils.parseEther(".05");
+      await vault.connect(self).deposit(depositAmount);
+      const vaultBalance = await vault.balance();
+      const strategyBalance = await strategy.balanceOf();
+      await strategy.panic();
+      const newVaultBalance = await vault.balance();
+      const newStrategyBalance = await strategy.balanceOf();
+      expect(vaultBalance).to.equal(strategyBalance);
+      // Accounting is not updated when panicking so newVaultBalance is 2x expected
+      //expect(newVaultBalance).to.equal(vaultBalance);
+      // It looks like the strategy still has balance because panic does not update balance
+      //expect(newStrategyBalance).to.equal(0);
+    });
+    xit("should be able to retire strategy", async function () {
+      // Test needs the require statement to be commented out during the test
+      await expect(strategy.retireStrat()).to.not.be.reverted;
+    });
+    xit("should be able to retire strategy with no balance", async function () {
+      // Test needs the require statement to be commented out during the test
+      await strategy.retireStrat();
+      const newVaultBalance = await vault.balance();
+      const newStrategyBalance = await strategy.balanceOf();
+      // const userBalance = await vault.balanceOf(selfAddress);
+      // console.log(`userBalance: ${userBalance}`);
+      // await vault.connect(self).withdraw(userBalance);
+      expect(vaultBalance).to.equal(strategyBalance);
+      // expect(newVaultBalance).to.equal(vaultBalance);
+      expect(newStrategyBalance).to.equal(0);
+    });
+    xit("should be able to estimate harvest", async function () {
+      const bigWhaleDepositAmount = ethers.utils.parseEther("133728");
+      await vault.connect(bigBooWhale).deposit(bigWhaleDepositAmount);
+      await strategy.harvest();
+      const minute = 60;
+      const hour = 60 * minute;
+      const day = 24 * hour;
+      await moveTimeForward(10 * day);
+      await updatePools(acelab);
+      const [profit, callFeeToUser] = await strategy.estimateHarvest();
+      const hasProfit = profit.gt(0);
+      const hasCallFee = callFeeToUser.gt(0);
+      expect(hasProfit).to.equal(true);
+      expect(hasCallFee).to.equal(true);
+    });
+    xit("should be able to check internal accounting", async function () {
+      const bigWhaleDepositAmount = ethers.utils.parseEther("133728");
+      await vault.connect(bigBooWhale).deposit(bigWhaleDepositAmount);
+      await strategy.harvest();
+      const minute = 60;
+      const hour = 60 * minute;
+      const day = 24 * hour;
+      await moveTimeForward(10 * day);
+      await updatePools(acelab);
+      const isAccurate = await strategy.isInternalAccountingAccurate();
+      expect(isAccurate).to.equal(true);
+    });
+    xit("should be able to update internal accounting", async function () {
+      const bigWhaleDepositAmount = ethers.utils.parseEther("133728");
+      await vault.connect(bigBooWhale).deposit(bigWhaleDepositAmount);
+      await strategy.harvest();
+      const minute = 60;
+      const hour = 60 * minute;
+      const day = 24 * hour;
+      await moveTimeForward(10 * day);
+      await updatePools(acelab);
+      await expect(strategy.updateInternalAccounting()).to.not.be.reverted;
+    });
+    xit("cannot add pools past the max cap", async function () {
+      const WFTM_ID = 2;
+      const WFTM = "0x21be370d5312f44cb42ce377bc9b8a0cef1a4c83";
+
+      await expect(strategy.addUsedPool(WFTM_ID, [WFTM, WFTM])).to.not.be
+        .reverted;
+      await expect(strategy.addUsedPool(WFTM_ID, [WFTM, WFTM])).to.not.be
+        .reverted;
+      await expect(strategy.addUsedPool(WFTM_ID, [WFTM, WFTM])).to.not.be
+        .reverted;
+      // Pool 16 is reverted
+      await expect(strategy.addUsedPool(WFTM_ID, [WFTM, WFTM])).to.be.reverted;
+    });
+    xit("should include xBoo gains in yield calculation", async function () {
+      const deposit = ethers.utils.parseEther("1");
+      const xBoodeposit1 = ethers.utils.parseEther("10");
+      const xBoodeposit2 = ethers.utils.parseEther("100");
+      const xBoodeposit3 = ethers.utils.parseEther("1000");
+      const xBoodeposit4 = ethers.utils.parseEther("10000");
+      const xBoodeposit5 = ethers.utils.parseEther("100000");
+      await vault.connect(bigBooWhale).deposit(deposit);
+      await strategy.harvest();
+      const minute = 60;
+      const hour = 60 * minute;
+      await moveTimeForward(13 * hour);
+      await boo.connect(bigBooWhale).transfer(xBooAddress, xBoodeposit1);
+      const [xBooProfit1] = await strategy.estimateHarvest();
+      console.log(`xBooProfit1: ${xBooProfit1}`);
+      await strategy.harvest();
+      await moveTimeForward(13 * hour);
+      await boo.connect(bigBooWhale).transfer(xBooAddress, xBoodeposit2);
+      const [xBooProfit2] = await strategy.estimateHarvest();
+      console.log(`xBooProfit2: ${xBooProfit2}`);
+      let apr = await strategy.averageAPRAcrossLastNHarvests(6);
+      console.log(`apr: ${apr}`);
+      await strategy.harvest();
+      await moveTimeForward(13 * hour);
+      await boo.connect(bigBooWhale).transfer(xBooAddress, xBoodeposit3);
+      const [xBooProfit3] = await strategy.estimateHarvest();
+      console.log(`xBooProfit3: ${xBooProfit3}`);
+      apr = await strategy.averageAPRAcrossLastNHarvests(6);
+      console.log(`apr: ${apr}`);
+      await strategy.harvest();
+      await moveTimeForward(13 * hour);
+      await boo.connect(bigBooWhale).transfer(xBooAddress, xBoodeposit4);
+      const [xBooProfit4] = await strategy.estimateHarvest();
+      console.log(`xBooProfit4: ${xBooProfit4}`);
+      apr = await strategy.averageAPRAcrossLastNHarvests(6);
+      console.log(`apr: ${apr}`);
+      await strategy.harvest();
+      await moveTimeForward(13 * hour);
+      await boo.connect(bigBooWhale).transfer(xBooAddress, xBoodeposit5);
+      const [xBooProfit5] = await strategy.estimateHarvest();
+      console.log(`xBooProfit5: ${xBooProfit5}`);
+      apr = await strategy.averageAPRAcrossLastNHarvests(6);
+      console.log(`apr: ${apr}`);
+      await strategy.harvest();
+      apr = await strategy.averageAPRAcrossLastNHarvests(6);
+      console.log(`apr: ${apr}`);
+    });
+  });
 });
