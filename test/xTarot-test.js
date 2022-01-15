@@ -10,8 +10,8 @@ const moveTimeForward = async (seconds) => {
   await network.provider.send("evm_mine");
 };
 
-const updatePools = async (acelab) => {
-  const tx = await acelab.massUpdatePools();
+const updatePools = async (_xStakingPoolController) => {
+  const tx = await _xStakingPoolController.massUpdatePools();
   await tx.wait();
 };
 
@@ -64,7 +64,7 @@ describe("Vaults", function () {
       params: [xTarotWhaleAddress],
     });
     self = await ethers.provider.getSigner(xTarotHolder);
-    tarotWhale = await ethers.provider.getSigner(xTarotWhaleAddress);
+    xTarotWhale = await ethers.provider.getSigner(xTarotWhaleAddress);
     await self.sendTransaction({
       to: xTarotWhaleAddress,
       value: ethers.utils.parseEther("1"),
@@ -105,9 +105,6 @@ describe("Vaults", function () {
     // Random address
     const strategist = "0x38a1fed9f600c4a062bda4520b39fec05b2b0e51";
     strategy = await Strategy.deploy(
-      uniRouter,
-      XStakingPoolControllerAddress,
-      tarotSupplyVaultRouter01,
       vault.address,
       treasury.address,
       strategist
@@ -116,7 +113,7 @@ describe("Vaults", function () {
     const WFTM = "0x21be370d5312f44cb42ce377bc9b8a0cef1a4c83";
     const TFTM_ID = 0;
     const TFTM = "0x0DeFeF0C977809DB8c1A3f13FD8DacBD565D968E";
-    const tx1 = await strategy.addUsedPool(TFTM_ID, [TFTM, WFTM]);
+    const tx1 = await strategy.addUsedPool(TFTM_ID, [WFTM, WFTM]);
     await tx1.wait();
     await vault.initialize(strategy.address);
     console.log(`Strategy deployed to ${strategy.address}`);
@@ -136,16 +133,16 @@ describe("Vaults", function () {
       .approve(vault.address, ethers.utils.parseEther("1000000000"));
     console.log("approvals4");
     await xTarot
-      .connect(tarotWhale)
+      .connect(xTarotWhale)
       .approve(vault.address, ethers.utils.parseEther("1000000000"));
     console.log("approvals5");
     await vault
-      .connect(tarotWhale)
+      .connect(xTarotWhale)
       .approve(vault.address, ethers.utils.parseEther("1000000000"));
   });
 
   describe("Deploying the vault and strategy", function () {
-    it("should initiate vault with a 0 balance", async function () {
+    xit("should initiate vault with a 0 balance", async function () {
       console.log(1);
       const totalBalance = await vault.balance();
       console.log(2);
@@ -161,7 +158,7 @@ describe("Vaults", function () {
     });
   });
   describe("Vault Tests", function () {
-    it("should allow deposits and account for them correctly", async function () {
+    xit("should allow deposits and account for them correctly", async function () {
       const userBalance = await xTarot.balanceOf(selfAddress);
       console.log(1);
       console.log(`userBalance: ${userBalance}`);
@@ -193,7 +190,7 @@ describe("Vaults", function () {
       expect(depositAmount).to.equal(newVaultBalance);
       expect(deductedAmount).to.equal(depositAmount);
     });
-    it("should mint user their pool share", async function () {
+    xit("should mint user their pool share", async function () {
       const userBalance = await xTarot.balanceOf(selfAddress);
       console.log(userBalance.toString());
       const depositAmount = ethers.utils.parseEther("0.0000005");
@@ -211,7 +208,7 @@ describe("Vaults", function () {
       expect(ownerShareBalance).to.equal(depositAmount);
       expect(selfShareBalance).to.equal(depositAmount);
     });
-    it("should allow withdrawals", async function () {
+    xit("should allow withdrawals", async function () {
       const userBalance = await xTarot.balanceOf(selfAddress);
       console.log(`userBalance: ${userBalance}`);
       const depositAmount = ethers.BigNumber.from(ethers.utils.parseEther("1"));
@@ -222,7 +219,7 @@ describe("Vaults", function () {
         )}`
       );
       const whaleDepositAmount = ethers.utils.parseEther("100");
-      await vault.connect(tarotWhale).deposit(whaleDepositAmount);
+      await vault.connect(xTarotWhale).deposit(whaleDepositAmount);
       const newUserBalance = userBalance.sub(depositAmount);
       const tokenBalance = await xTarot.balanceOf(selfAddress);
       const balanceDifferenceIsZero = tokenBalance.sub(newUserBalance).isZero();
@@ -247,7 +244,7 @@ describe("Vaults", function () {
     xit("should be able to harvest", async function () {
       await strategy.connect(self).harvest();
     });
-    xit("should provide yield", async function () {
+    it("should provide yield", async function () {
       await strategy.connect(self).harvest();
       const depositAmount = ethers.utils.parseEther(".05");
       await vault.connect(self).deposit(depositAmount);
@@ -258,21 +255,17 @@ describe("Vaults", function () {
       await strategy.connect(self).harvest();
       const newVaultBalance = await vault.balance();
       console.log(`newVaultBalance: ${newVaultBalance}`);
-      const whaleDepositAmount = ethers.utils.parseEther("4628");
-      await vault.connect(booWhale).deposit(whaleDepositAmount);
-      const bigWhaleDepositAmount = ethers.utils.parseEther("327171");
-      await vault.connect(bigBooWhale).deposit(bigWhaleDepositAmount);
+      const whaleDepositAmount = ethers.utils.parseEther("133728");
+      await vault.connect(xTarotWhale).deposit(whaleDepositAmount);
       const minute = 60;
       const hour = 60 * minute;
       const day = 24 * hour;
       await moveTimeForward(10 * day);
-      await updatePools(acelab);
+      await updatePools(xStakingPoolController);
       await strategy.connect(self).harvest();
       const newVaultBalance2 = await vault.balance();
       console.log(`newVaultBalance2: ${newVaultBalance2}`);
-      const totalDepositAmount = depositAmount
-        .add(whaleDepositAmount)
-        .add(bigWhaleDepositAmount);
+      const totalDepositAmount = depositAmount.add(whaleDepositAmount);
       console.log(`totalDepositAmount: ${totalDepositAmount}`);
       const hasYield = newVaultBalance2 > totalDepositAmount;
       console.log(`hasYield: ${hasYield}`);
@@ -351,7 +344,7 @@ describe("Vaults", function () {
   //     const hour = 60 * minute;
   //     const day = 24 * hour;
   //     await moveTimeForward(10 * day);
-  //     await updatePools(acelab);
+  //     await updatePools(xStakingPoolController);
   //     const [profit, callFeeToUser] = await strategy.estimateHarvest();
   //     const hasProfit = profit.gt(0);
   //     const hasCallFee = callFeeToUser.gt(0);

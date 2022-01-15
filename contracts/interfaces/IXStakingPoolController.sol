@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-import "./IERC20.sol";
+import "./ISupplyVault.sol";
 
 pragma solidity 0.8.9;
 
@@ -13,7 +13,7 @@ interface IXStakingPoolController {
 
     // Info of each pool.
     struct PoolInfo {
-        IERC20 RewardToken; // Address of reward token contract.
+        ISupplyVault RewardToken; // Address of reward token contract.
         uint256 RewardPerSecond; // reward token per second for this pool
         uint256 TokenPrecision; // The precision factor used for calculations, dependent on a tokens decimals
         uint256 xTAROTStakedAmount; // # of xTAROT allocated to this pool
@@ -25,7 +25,12 @@ interface IXStakingPoolController {
         address protocolOwnerAddress; // owner of the protocol of the reward token, used for emergency withdraw only
     }
 
-    function poolInfo(uint256 _index) external view returns (PoolInfo memory);
+    function poolInfo(uint256 _poolId) external view returns (PoolInfo memory);
+
+    function userInfo(uint256 _poolId, address _userAddress)
+        external
+        view
+        returns (uint256 amount, uint256 rewardDebt);
 
     function poolLength() external view returns (uint256);
 
