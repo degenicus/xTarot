@@ -317,39 +317,41 @@ describe("Vaults", function () {
       const vaultBalance = await vault.balance();
       const strategyBalance = await strategy.balanceOf();
       await strategy.panic();
-      const newVaultBalance = await vault.balance();
-      const newStrategyBalance = await strategy.balanceOf();
+
       expect(vaultBalance).to.equal(strategyBalance);
       // Accounting is not updated when panicking so newVaultBalance is 2x expected
-      //expect(newVaultBalance).to.equal(vaultBalance);
-      // It looks like the strategy still has balance because panic does not update balance
-      //expect(newStrategyBalance).to.equal(0);
+      await strategy.updateInternalAccounting();
+      const newVaultBalance = await vault.balance();
+      const newStrategyBalance = await strategy.balanceOf();
+      expect(newVaultBalance).to.equal(vaultBalance);
+      expect(newStrategyBalance).to.equal(0);
     });
     xit("should be able to retire strategy", async function () {
+      const depositAmount = ethers.utils.parseEther(".05");
+      await vault.connect(self).deposit(depositAmount);
+      const vaultBalance = await vault.balance();
+      const strategyBalance = await strategy.balanceOf();
+      expect(vaultBalance).to.equal(strategyBalance);
       // Test needs the require statement to be commented out during the test
       await expect(strategy.retireStrat()).to.not.be.reverted;
+      const newVaultBalance = await vault.balance();
+      const newStrategyBalance = await strategy.balanceOf();
+      expect(newVaultBalance).to.equal(vaultBalance);
+      expect(newStrategyBalance).to.equal(0);
     });
     xit("should be able to retire strategy with no balance", async function () {
       // Test needs the require statement to be commented out during the test
-      await strategy.retireStrat();
-      const newVaultBalance = await vault.balance();
-      const newStrategyBalance = await strategy.balanceOf();
-      // const userBalance = await vault.balanceOf(selfAddress);
-      // console.log(`userBalance: ${userBalance}`);
-      // await vault.connect(self).withdraw(userBalance);
-      expect(vaultBalance).to.equal(strategyBalance);
-      // expect(newVaultBalance).to.equal(vaultBalance);
-      expect(newStrategyBalance).to.equal(0);
+      await expect(strategy.retireStrat()).to.not.be.reverted;
     });
     xit("should be able to estimate harvest", async function () {
-      const bigWhaleDepositAmount = ethers.utils.parseEther("133728");
-      await vault.connect(bigBooWhale).deposit(bigWhaleDepositAmount);
+      const whaleDepositAmount = ethers.utils.parseEther("133728");
+      await vault.connect(xTarotWhale).deposit(whaleDepositAmount);
       await strategy.harvest();
       const minute = 60;
       const hour = 60 * minute;
       const day = 24 * hour;
       await moveTimeForward(10 * day);
-      await updatePools(acelab);
+      await updatePools(xStakingPoolController);
       const [profit, callFeeToUser] = await strategy.estimateHarvest();
       const hasProfit = profit.gt(0);
       const hasCallFee = callFeeToUser.gt(0);

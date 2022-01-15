@@ -211,6 +211,45 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
     }
 
     /**
+     * @dev Check if the internal pool accounting matches with AceLab
+     */
+    function isInternalAccountingAccurate() external view returns (bool) {
+        uint256 total = 0;
+        for (uint256 index = 0; index < currentlyUsedPools.length; index++) {
+            uint256 _poolId = currentlyUsedPools[index];
+            (uint256 amount, ) = IXStakingPoolController(stakingPoolController)
+                .userInfo(_poolId, address(this));
+            uint256 internalBalance = poolxTarotBalance[_poolId];
+            total = total.add(amount);
+            if (amount != internalBalance) {
+                return false;
+            }
+        }
+        if (total != totalPoolBalance) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * @dev If internal accounting is off this function can synchronize
+     *      the internal pool accounting with AceLab
+     */
+    function updateInternalAccounting() external returns (bool) {
+        _onlyStrategistOrOwner();
+        uint256 total = 0;
+        for (uint256 index = 0; index < currentlyUsedPools.length; index++) {
+            uint256 _poolId = currentlyUsedPools[index];
+            (uint256 amount, ) = IXStakingPoolController(stakingPoolController)
+                .userInfo(_poolId, address(this));
+            poolxTarotBalance[_poolId] = amount;
+            total = total.add(amount);
+        }
+        totalPoolBalance = total;
+        return true;
+    }
+
+    /**
      * @dev Core function of the strat, in charge of collecting and re-investing rewards.
      * 1. It claims rewards from the XStakingPoolController pools and estimated the current yield for each pool.
      * 2. It charges the system fees to simplify the split.
@@ -227,7 +266,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
 
     /**
      * @dev Returns the approx amount of profit from harvesting.
-     *      Profit is denominated in WFTM, and takes fees into account.
+     *      Profit is denominated in wftm, and takes fees into account.
      */
     function estimateHarvest()
         external
@@ -235,33 +274,31 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
         override
         returns (uint256 profit, uint256 callFeeToUser)
     {
-        // for (uint256 index = 0; index < currentlyUsedPools.length; index++) {
-        //     uint8 poolId = currentlyUsedPools[index];
-        //     uint256 pendingReward = IXStakingPoolController(stakingPoolController).pendingReward(
-        //         poolId,
-        //         address(this)
-        //     );
-        //     if (pendingReward == 0) {
-        //         continue;
-        //     }
-        //     address rewardToken = address(
-        //         IXStakingPoolController(stakingPoolController).poolInfo(poolId).RewardToken
-        //     );
-        //     if (rewardToken == wftm) {
-        //         profit = profit.add(pendingReward);
-        //     } else {
-        //         address[] memory path = new address[](2);
-        //         path[0] = rewardToken;
-        //         path[1] = wftm;
-        //         uint256[] memory amountOutMins = IUniswapRouterETH(uniRouter)
-        //             .getAmountsOut(pendingReward, path);
-        //         profit = profit.add(amountOutMins[1]);
-        //     }
-        // }
-        // // // take out fees from profit
-        // uint256 wftmFee = profit.mul(totalFee).div(PERCENT_DIVISOR);
-        // callFeeToUser = wftmFee.mul(callFee).div(PERCENT_DIVISOR);
-        // profit = profit.sub(wftmFee);
+        for (uint256 index = 0; index < currentlyUsedPools.length; index++) {
+            uint256 poolId = currentlyUsedPools[index];
+            uint256 pendingReward = IXStakingPoolController(
+                stakingPoolController
+            ).pendingReward(poolId, address(this));
+            if (pendingReward == 0) {
+                continue;
+            }
+
+            if (poolRewardToWftmPaths[poolId][0] == wftm) {
+                profit = profit.add(pendingReward);
+            } else {
+                uint256[] memory amountOutMins = IUniswapRouterETH(uniRouter)
+                    .getAmountsOut(
+                        pendingReward,
+                        poolRewardToWftmPaths[poolId]
+                    );
+                profit = profit.add(amountOutMins[1]);
+            }
+        }
+
+        // // take out fees from profit
+        uint256 wftmFee = profit.mul(totalFee).div(PERCENT_DIVISOR);
+        callFeeToUser = wftmFee.mul(callFee).div(PERCENT_DIVISOR);
+        profit = profit.sub(wftmFee);
     }
 
     /**
@@ -517,35 +554,35 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      * vault, ready to be migrated to the new strat.
      */
     function retireStrat() external {
-        // require(msg.sender == vault, "!vault");
-        // for (uint256 index = 0; index < currentlyUsedPools.length; index++) {
-        //     uint8 poolId = currentlyUsedPools[index];
-        //     uint256 balance = poolxTarotBalance[poolId];
-        //     IXStakingPoolController(stakingPoolController).withdraw(poolId, balance);
-        //     totalPoolBalance = totalPoolBalance.sub(balance);
-        //     poolxTarotBalance[poolId] = 0;
-        //     _swapRewardToWftm(poolId);
-        // }
-        // _compoundRewards();
-        // uint256 xTarotBalance = IERC20(xBoo).balanceOf(address(this));
-        // IBooMirrorWorld(xBoo).leave(xTarotBalance);
-        // uint256 xTarotBalance = IERC20(xTarot).balanceOf(address(this));
-        // IERC20(xTarot).transfer(vault, xTarotBalance);
+        //require(msg.sender == vault, "!vault");
+        for (uint256 index = 0; index < currentlyUsedPools.length; index++) {
+            uint256 poolId = currentlyUsedPools[index];
+            uint256 balance = poolxTarotBalance[poolId];
+            _stakingControllerWithdraw(poolId, balance);
+            _swapRewardToWftm(poolId);
+        }
+
+        _swapWftmToTarot();
+
+        uint256 xTarotBalance = IERC20(xTarot).balanceOf(address(this));
+        xTarot.transfer(vault, xTarotBalance);
     }
 
     /**
-     * @dev Pauses deposits. Withdraws all funds from the XStakingPoolController contract, leaving rewards behind.
+     * @dev Pauses deposits. Withdraws all funds from the AceLab contract, leaving rewards behind.
      */
-    function panic() public onlyOwner {
-        // for (uint256 index = 0; index < currentlyUsedPools.length; index++) {
-        //     uint8 poolId = currentlyUsedPools[index];
-        //     IXStakingPoolController(stakingPoolController).emergencyWithdraw(poolId);
-        // }
-        // uint256 xTarotBalance = IERC20(xBoo).balanceOf(address(this));
-        // IBooMirrorWorld(xBoo).leave(xTarotBalance);
-        // uint256 xTarotBalance = IERC20(xTarot).balanceOf(address(this));
-        // IERC20(xTarot).transfer(vault, xTarotBalance);
-        // pause();
+    function panic() public {
+        _onlyStrategistOrOwner();
+        pause();
+
+        for (uint256 index = 0; index < currentlyUsedPools.length; index++) {
+            uint256 poolId = currentlyUsedPools[index];
+            IXStakingPoolController(stakingPoolController).emergencyWithdraw(
+                poolId
+            );
+        }
+        uint256 xTarotBalance = xTarot.balanceOf(address(this));
+        xTarot.transfer(vault, xTarotBalance);
     }
 
     /**
