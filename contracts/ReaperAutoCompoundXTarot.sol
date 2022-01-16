@@ -7,15 +7,13 @@ import "./interfaces/IXStakingPoolController.sol";
 import "./interfaces/IPaymentRouter.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "hardhat/console.sol";
-
 pragma solidity 0.8.9;
 
 /**
  * @dev This is a strategy to stake Boo into xBoo, and then stake xBoo in different pools to collect more rewards
  * The strategy will compound the pool rewards into Boo which will be deposited into the strategy for more yield.
  */
-contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
+contract ReaperAutoCompoundXTarot is ReaperBaseStrategy {
     using SafeERC20 for IERC20;
 
     /**

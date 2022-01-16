@@ -2,6 +2,8 @@ require("@nomiclabs/hardhat-waffle");
 require("hardhat-gas-reporter");
 require("hardhat-contract-sizer");
 
+const { devAccount } = require("./secrets.json");
+
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
 task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
@@ -19,6 +21,12 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
  * @type import('hardhat/config').HardhatUserConfig
  */
 module.exports = {
+  networks: {
+    opera: {
+      url: "https://rpc.ftm.tools/",
+      accounts: [devAccount],
+    },
+  },
   solidity: {
     compilers: [
       {
