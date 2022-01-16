@@ -18,7 +18,7 @@ abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
     }
 
     Harvest[] public harvestLog;
-    uint256 public harvestLogCadence = 12 hours;
+    uint256 public harvestLogCadence = 10 minutes;
     uint256 public lastHarvestTimestamp;
 
     /**
@@ -210,7 +210,7 @@ abstract contract ReaperBaseStrategy is AccessControlEnumerable, Pausable {
     }
 
     /**
-     * @dev updates the total fee, capped at 5%; only owner.
+     * @dev updates the total fee, capped at 10%; only owner.
      */
     function updateTotalFee(uint256 _totalFee)
         external
