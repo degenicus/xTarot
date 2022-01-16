@@ -26,8 +26,8 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      */
     address public constant WFTM =
         address(0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83);
-    address public constant TAROT =
-        address(0xC5e2B037D30a390e62180970B3aa4E91868764cD);
+    IERC20 public constant TAROT =
+        IERC20(0xC5e2B037D30a390e62180970B3aa4E91868764cD);
     ISupplyVault public constant XTAROT =
         ISupplyVault(0x74D1D2A851e339B8cB953716445Be7E8aBdf92F4);
 
@@ -46,7 +46,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      * {wftmToBooRoute} - Route we take to get from {WFTM} into {XTAROT}.
      * {poolRewardToWftmPaths} - Routes for each pool to get from {pool reward token} into {WFTM}.
      */
-    address[] public wftmToTarotRoute = [WFTM, TAROT];
+    address[] public wftmToTarotRoute = [WFTM, address(TAROT)];
     mapping(uint256 => address[]) public poolRewardToWftmPaths;
 
     /**
@@ -130,28 +130,15 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
 
         uint256 xTarotBalance = IERC20(XTAROT).balanceOf(address(this));
 
-        console.log("withdraw");
-
-        console.log("_amount: ", _amount);
-
         if (xTarotBalance < _amount) {
-            console.log("for loop");
-            console.log(
-                "currentlyUsedPools.length: ",
-                currentlyUsedPools.length
-            );
             for (
                 uint256 index = currentlyUsedPools.length;
                 index > 0 && xTarotBalance < _amount;
                 index--
             ) {
                 uint256 poolId = currentlyUsedPools[index - 1];
-                console.log("poolId: ", poolId);
                 uint256 currentPoolxTarotBalance = poolxTarotBalance[poolId];
-                console.log(
-                    "currentPoolxTarotBalance: ",
-                    currentPoolxTarotBalance
-                );
+
                 if (currentPoolxTarotBalance > 0) {
                     uint256 remainingxTarotAmount = _amount - xTarotBalance;
                     uint256 withdrawAmount;
@@ -160,12 +147,9 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
                     } else {
                         withdrawAmount = remainingxTarotAmount;
                     }
-                    console.log("withdrawAmount: ", withdrawAmount);
+
                     _stakingControllerWithdraw(poolId, withdrawAmount);
                     xTarotBalance = IERC20(XTAROT).balanceOf(address(this));
-                    if (xTarotBalance >= _amount) {
-                        break;
-                    }
                 }
             }
         }
@@ -174,10 +158,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
         }
 
         uint256 withdrawFee = (xTarotBalance * securityFee) / PERCENT_DIVISOR;
-        console.log(
-            "xTarotBalance - withdrawFee: ",
-            xTarotBalance - withdrawFee
-        );
+
         IERC20(XTAROT).safeTransfer(vault, xTarotBalance - withdrawFee);
     }
 
@@ -361,20 +342,16 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
         }
         // Total seconds the pool will receive rewards up to the next harvest (when strategy rebalances)
         uint256 multiplier = _getMultiplier(_from, _to, poolInfo);
-        console.log("multiplier: ", multiplier);
         uint256 totalTokens = multiplier * poolInfo.RewardPerSecond;
-        console.log("totalTokens: ", totalTokens);
         if (totalTokens == 0) {
             poolYield[_poolId] = 0;
             return;
         }
 
         if (poolRewardToWftmPaths[_poolId][0] == WFTM) {
-            console.log("poolRewardToWftmPaths[_poolId][0] == WFTM");
             uint256 wftmYield = (1 ether * totalTokens) /
                 poolInfo.xTAROTStakedAmount;
             poolYield[_poolId] = wftmYield;
-            console.log("wftmYield: ", wftmYield);
         } else {
             uint256 wftmTotalPoolYield = IUniswapRouter(UNI_ROUTER)
                 .getAmountsOut(totalTokens, poolRewardToWftmPaths[_poolId])[1];
@@ -421,16 +398,11 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
             return;
         }
         uint256 wftmFee = (wftmBalance * totalFee) / PERCENT_DIVISOR;
-        console.log("wftmFee: ", wftmFee);
         uint256 callFeeToUser = (wftmFee * callFee) / PERCENT_DIVISOR;
-
         uint256 treasuryFeeToVault = (wftmFee * treasuryFee) / PERCENT_DIVISOR;
-
         uint256 feeToStrategist = (treasuryFeeToVault * strategistFee) /
             PERCENT_DIVISOR;
         treasuryFeeToVault = treasuryFeeToVault - feeToStrategist;
-        console.log("feeToStrategist: ", feeToStrategist);
-        console.log("treasuryFeeToVault: ", treasuryFeeToVault);
 
         IERC20(WFTM).safeTransfer(msg.sender, callFeeToUser);
         IERC20(WFTM).safeTransfer(treasury, treasuryFeeToVault);
@@ -453,7 +425,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
                     address(this),
                     block.timestamp + 10
                 );
-            tarotBalance = IERC20(TAROT).balanceOf(address(this));
+            tarotBalance = TAROT.balanceOf(address(this));
         }
     }
 
@@ -527,6 +499,13 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
     }
 
     /**
+     * @dev It calculates how much {TAROT} the contract holds.
+     */
+    function balanceOfTarot() public view returns (uint256) {
+        return TAROT.balanceOf(address(this));
+    }
+
+    /**
      * @dev It calculates how much {XTAROT} the strategy has allocated in the XStakingPoolController pools
      */
     function balanceOfPool() public view returns (uint256) {
@@ -538,7 +517,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      * vault, ready to be migrated to the new strat.
      */
     function retireStrat() external {
-        //require(msg.sender == vault, "!vault");
+        require(msg.sender == vault, "!vault");
         for (uint256 index = 0; index < currentlyUsedPools.length; index++) {
             uint256 poolId = currentlyUsedPools[index];
             uint256 balance = poolxTarotBalance[poolId];
@@ -596,8 +575,8 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      */
     function _giveAllowances() internal {
         // // Give xBoo contract permission to stake xBoo
-        IERC20(TAROT).safeApprove(address(XTAROT), 0);
-        IERC20(TAROT).safeApprove(address(XTAROT), type(uint256).max);
+        TAROT.safeApprove(address(XTAROT), 0);
+        TAROT.safeApprove(address(XTAROT), type(uint256).max);
         // // Give xBoo contract permission to stake xBoo
         IERC20(XTAROT).safeApprove(POOL_CONTROLLER, 0);
         IERC20(XTAROT).safeApprove(POOL_CONTROLLER, type(uint256).max);
@@ -615,7 +594,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      */
     function _removeAllowances() internal {
         // Remove xBoo contract permission to stake xBoo
-        IERC20(TAROT).safeApprove(address(XTAROT), 0);
+        TAROT.safeApprove(address(XTAROT), 0);
         // Remove xBoo contract permission to stake xBoo
         IERC20(XTAROT).safeApprove(POOL_CONTROLLER, 0);
         // Remove UNI_ROUTER permission to swap WFTM to XTAROT
@@ -664,6 +643,15 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
             "Must be a positive pool dilution factor"
         );
         maxPoolDilutionFactor = _maxPoolDilutionFactor;
+    }
+
+    /**
+     * @dev updates the {maxNrOfPools}
+     */
+    function updateMaxNrOfPools(uint256 _maxNrOfPools) external {
+        require(maxNrOfPools != 0, "!=0");
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Not authorized");
+        maxNrOfPools = _maxNrOfPools;
     }
 
     /**

@@ -101,11 +101,12 @@ describe("Vaults", function () {
       XStakingPoolControllerAddress
     );
     console.log("tarot attached");
+    const oneDay = 86400;
     vault = await Vault.deploy(
       xTarotAddress,
       "XTAROT Single Stake Vault",
       "rfXTAROT",
-      432000,
+      oneDay,
       0,
       ethers.utils.parseEther("999999")
     );
