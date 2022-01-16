@@ -1,16 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-import "./abstract/Ownable.sol";
-import "./abstract/Pausable.sol";
 import "./abstract/ReaperBaseStrategy.sol";
-import "./interfaces/IERC20.sol";
-import "./interfaces/IUniswapRouterETH.sol";
-import "./interfaces/ISupplyVaultRouter01.sol";
-import "./interfaces/IBorrowable.sol";
+import "./interfaces/IUniswapRouter.sol";
 import "./interfaces/ISupplyVault.sol";
 import "./interfaces/IXStakingPoolController.sol";
-import "./libraries/SafeERC20.sol";
-// import "./libraries/BorrowableHelpers.sol";
+import "./interfaces/IPaymentRouter.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "hardhat/console.sol";
 
@@ -90,9 +85,9 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      */
     constructor(
         address _vault,
-        address _treasury,
-        address _strategist
-    ) ReaperBaseStrategy(_vault, _treasury, _strategist) {
+        address[] memory _feeRemitters,
+        address[] memory _strategists
+    ) ReaperBaseStrategy(_vault, _feeRemitters, _strategists) {
         _giveAllowances();
     }
 
@@ -276,7 +271,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
             if (poolRewardToWftmPaths[poolId][0] == WFTM) {
                 profit = profit + pendingReward;
             } else {
-                uint256[] memory amountOutMins = IUniswapRouterETH(UNI_ROUTER)
+                uint256[] memory amountOutMins = IUniswapRouter(UNI_ROUTER)
                     .getAmountsOut(
                         pendingReward,
                         poolRewardToWftmPaths[poolId]
@@ -326,14 +321,14 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
      * @dev Swaps any pool reward token to WFTM
      */
     function _swapRewardToWftm(uint256 _poolId) internal {
-        address[] memory rewardToWftmPaths = poolRewardToWftmPaths[_poolId];
+        address[] storage rewardToWftmPaths = poolRewardToWftmPaths[_poolId];
         address underlyingRewardToken = rewardToWftmPaths[0];
         uint256 rewardBalance = IERC20(underlyingRewardToken).balanceOf(
             address(this)
         );
 
         if (rewardBalance != 0 && underlyingRewardToken != WFTM) {
-            IUniswapRouterETH(UNI_ROUTER)
+            IUniswapRouter(UNI_ROUTER)
                 .swapExactTokensForTokensSupportingFeeOnTransferTokens(
                     rewardBalance,
                     0,
@@ -381,7 +376,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
             poolYield[_poolId] = wftmYield;
             console.log("wftmYield: ", wftmYield);
         } else {
-            uint256 wftmTotalPoolYield = IUniswapRouterETH(UNI_ROUTER)
+            uint256 wftmTotalPoolYield = IUniswapRouter(UNI_ROUTER)
                 .getAmountsOut(totalTokens, poolRewardToWftmPaths[_poolId])[1];
             uint256 wftmYield = (1 ether * wftmTotalPoolYield) /
                 poolInfo.xTAROTStakedAmount;
@@ -439,7 +434,9 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
 
         IERC20(WFTM).safeTransfer(msg.sender, callFeeToUser);
         IERC20(WFTM).safeTransfer(treasury, treasuryFeeToVault);
-        IERC20(WFTM).safeTransfer(strategist, feeToStrategist);
+        IERC20(WFTM).safeApprove(strategistRemitter, 0);
+        IERC20(WFTM).safeApprove(strategistRemitter, feeToStrategist);
+        IPaymentRouter(strategistRemitter).routePayment(WFTM, feeToStrategist);
     }
 
     /**
@@ -448,7 +445,7 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
     function _swapWftmToTarot() internal returns (uint256 tarotBalance) {
         uint256 wftmBalance = IERC20(WFTM).balanceOf(address(this));
         if (wftmBalance != 0) {
-            IUniswapRouterETH(UNI_ROUTER)
+            IUniswapRouter(UNI_ROUTER)
                 .swapExactTokensForTokensSupportingFeeOnTransferTokens(
                     wftmBalance,
                     0,
@@ -573,7 +570,8 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
     /**
      * @dev Pauses the strat.
      */
-    function pause() public onlyOwner {
+    function pause() public {
+        _onlyStrategistOrOwner();
         _pause();
         _removeAllowances();
     }
@@ -581,7 +579,8 @@ contract ReaperAutoCompoundTarot is ReaperBaseStrategy {
     /**
      * @dev Unpauses the strat.
      */
-    function unpause() external onlyOwner {
+    function unpause() external {
+        _onlyStrategistOrOwner();
         _unpause();
 
         _giveAllowances();

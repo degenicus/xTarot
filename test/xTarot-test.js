@@ -21,14 +21,18 @@ describe("Vaults", function () {
   let Treasury;
   let Tarot;
   let XStakingPoolController;
+  let PaymentRouter;
   let vault;
   let strategy;
   let treasury;
   let xTarot;
+  let strategist;
+  let paymentRouterAddress = "0x603e60d22af05ff77fdcf05c063f582c40e55aae";
   const tarotSupplyVaultRouter01 = "0x3E9F34309B2f046F4f43c0376EFE2fdC27a10251";
   const tarotAddress = "0xC5e2B037D30a390e62180970B3aa4E91868764cD";
   const xTarotAddress = "0x74D1D2A851e339B8cB953716445Be7E8aBdf92F4";
   const bTarotAddress = "0xe0d10cefc6cdfbbde41a12c8bbe9548587568329";
+  const strategistAddress = "0x3b410908e71Ee04e7dE2a87f8F9003AFe6c1c7cE";
   const XStakingPoolControllerAddress =
     "0x466eBD9EC2027776fa11a982E9BBe4F67aa6e86B";
   const uniRouter = "0xF491e7B69E4244ad4002BC14e878a34207E38c29";
@@ -63,7 +67,12 @@ describe("Vaults", function () {
       method: "hardhat_impersonateAccount",
       params: [xTarotWhaleAddress],
     });
+    await hre.network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: [strategistAddress],
+    });
     self = await ethers.provider.getSigner(xTarotHolder);
+    strategist = await ethers.provider.getSigner(strategistAddress);
     xTarotWhale = await ethers.provider.getSigner(xTarotWhaleAddress);
     await self.sendTransaction({
       to: xTarotWhaleAddress,
@@ -74,6 +83,7 @@ describe("Vaults", function () {
     console.log("addresses");
     //get artifacts
     Strategy = await ethers.getContractFactory("ReaperAutoCompoundTarot");
+    PaymentRouter = await ethers.getContractFactory("PaymentRouter");
     Vault = await ethers.getContractFactory("ReaperVaultv1_3");
     Treasury = await ethers.getContractFactory("ReaperTreasury");
     XTarot = await ethers.getContractFactory(
@@ -102,14 +112,19 @@ describe("Vaults", function () {
     console.log("vault");
     console.log(`vault.address: ${vault.address}`);
     console.log(`treasury.address: ${treasury.address}`);
-    // Random address
-    const strategist = "0x38a1fed9f600c4a062bda4520b39fec05b2b0e51";
     strategy = await Strategy.deploy(
       vault.address,
-      treasury.address,
-      strategist
+      [treasury.address, paymentRouterAddress],
+      [strategistAddress]
     );
     console.log("strategy");
+
+    paymentRouter = await PaymentRouter.attach(paymentRouterAddress);
+    await paymentRouter
+      .connect(strategist)
+      .addStrategy(strategy.address, [strategistAddress], [100]);
+    console.log("payment router");
+
     const WFTM = "0x21be370d5312f44cb42ce377bc9b8a0cef1a4c83";
     const TFTM_ID = 0;
     const TFTM = "0x0DeFeF0C977809DB8c1A3f13FD8DacBD565D968E";
@@ -244,7 +259,7 @@ describe("Vaults", function () {
     xit("should be able to harvest", async function () {
       await strategy.connect(self).harvest();
     });
-    xit("should provide yield", async function () {
+    it("should provide yield", async function () {
       await strategy.connect(self).harvest();
       const depositAmount = ethers.utils.parseEther(".05");
       await vault.connect(self).deposit(depositAmount);
